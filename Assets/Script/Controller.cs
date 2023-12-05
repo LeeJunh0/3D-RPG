@@ -5,6 +5,7 @@ using UnityEngine;
 public class Controller : MonoBehaviour
 {
     enum PlayerState { IDLE, MOVE, ATTACK };
+    enum AttackState { NONE ,ONE, TWO, THREE };
 
     [SerializeField]
     private Transform Camera;
@@ -19,20 +20,65 @@ public class Controller : MonoBehaviour
     [SerializeField]
     private PlayerState CurState = PlayerState.IDLE;
     [SerializeField]
-    private float ComboDeley;
+    private AttackState CurAttState = AttackState.NONE;
+    [SerializeField]
+    private float ComboDeley;   
+    [SerializeField]
+    private int AttNum;
+
     Rigidbody Rigid;
     Animator anim;
     Vector2 MoveInput;
-    int AttNum;
+    float CurDeley;
     bool UnderAttack = false;
+
+    //public bool MouseInput;
     void Start()
     {
         Rigid = GetComponent<Rigidbody>();
         anim = PlayerObject.GetComponent<Animator>();
     }
-    
+    private void Update()
+    {
+        if(CurDeley > ComboDeley)
+        {
+            AttackInit();
+        }
+
+        if(UnderAttack == true)        
+            CurDeley += Time.deltaTime;
+        
+        if(Input.GetMouseButtonDown(0))
+        {
+            AttNum++;
+            CurDeley = 0f;
+            switch(AttNum)
+            {
+                case 1:                   
+                    UnderAttack = true;
+                    Attack1Play();
+                    break;
+                case 2:
+                    Attack2Play();
+                    break;
+                case 3:
+                    anim.SetBool("Attack3", true);
+                    if(anim.GetCurrentAnimatorStateInfo(0).IsName("Attack3"))
+                    {
+                        if(anim.GetCurrentAnimatorStateInfo(0).normalizedTime == 0.9f)
+                            AttackInit();
+                    }
+                    
+                    break;
+            }
+            AttNum = Mathf.Clamp(AttNum, 0, 3);
+        }
+    }
+
     private void FixedUpdate()
     {
+        Debug.DrawRay(Camera.position, new Vector3(Camera.forward.x, 0f, Camera.forward.z), Color.blue);
+
         MoveInput = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
         bool isCheck = MoveInput.magnitude != 0;
         switch (CurState)
@@ -40,43 +86,30 @@ public class Controller : MonoBehaviour
             case PlayerState.IDLE:
                 anim.SetFloat("Move", 0f);
 
-                if (isCheck == true)
-                {
+                if (isCheck == true)                
                     CurState = PlayerState.MOVE;
-                }
                 
-                if (Input.GetMouseButtonDown(0))
-                {
-                    CurState = PlayerState.ATTACK;
-                }
+                if (Input.GetMouseButtonDown(0))                
+                    CurState = PlayerState.ATTACK;               
                 break;
             case PlayerState.MOVE:
                 Moving();
 
-                if(isCheck == false)
-                {
+                if(isCheck == false)                
                     CurState = PlayerState.IDLE;
-                }
-
-                if (Input.GetMouseButtonDown(0))
-                {
-                    CurState = PlayerState.ATTACK;
-                }
+                
+                if (Input.GetMouseButtonDown(0))                
+                    CurState = PlayerState.ATTACK;               
                 break;
             case PlayerState.ATTACK:
-                if(UnderAttack != true)
+                if(UnderAttack == false)
                 {
-                    Attack(AttNum);
-                }
-
-                if(isCheck == true)
-                {
-                    CurState = PlayerState.MOVE;
-                }
-                else
-                {
-                    CurState = PlayerState.IDLE;
-                }
+                    if (isCheck == true)                    
+                        CurState = PlayerState.MOVE;
+                    
+                    else                    
+                        CurState = PlayerState.IDLE;                    
+                }               
                 break;
         }     
         
@@ -85,8 +118,6 @@ public class Controller : MonoBehaviour
 
     private void Moving()
     {
-        Debug.DrawRay(Camera.position, new Vector3(Camera.forward.x, 0f, Camera.forward.z), Color.blue);
-
         anim.SetFloat("Move", 0.2f);
 
         Vector3 LookForward = new Vector3(Camera.forward.x, 0f, Camera.forward.z).normalized;
@@ -97,27 +128,22 @@ public class Controller : MonoBehaviour
         Rigid.velocity = MoveDir * Time.deltaTime * MoveCheck(Input.GetKey(KeyCode.LeftShift));
     }
 
-    private void Attack(int num)
+    void AttackInit()
     {
-        anim.SetFloat("Combo", num);
-        anim.SetTrigger("Attack");
-        StartCoroutine(Combo());
+        anim.SetBool("Attack1", false);
+        anim.SetBool("Attack2", false);
+        anim.SetBool("Attack3", false);
+        AttNum = 0;
+        UnderAttack = false;
+    }
+    public void Attack1Play()
+    {
+        anim.SetBool("Attack1", true);
     }
 
-    IEnumerator Combo()
+    public void Attack2Play()
     {
-        float curtime = 0f;
-        yield return null;
-
-        while(curtime >= ComboDeley || AttNum < 3)
-        {
-            curtime += Time.deltaTime;
-            if(Input.GetMouseButtonDown(0))
-            {
-                Attack(AttNum++);
-            }
-        }
-        AttNum = 0;
+        anim.SetBool("Attack2",true);      
     }
     private float MoveCheck(bool Check)
     {
